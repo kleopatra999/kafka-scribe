@@ -1,0 +1,42 @@
+{
+	"ImportPath": "github.com/deviantart/kafka-scribe",
+	"GoVersion": "go1.4.1",
+	"Deps": [
+		{
+			"ImportPath": "code.google.com/p/snappy-go/snappy",
+			"Comment": "null-20",
+			"Rev": "8850bd446ad6f18a271a08aae26bdf85bdf87c7f"
+		},
+		{
+			"ImportPath": "github.com/Shopify/sarama",
+			"Comment": "v1.4.0-8-gc0f48c6",
+			"Rev": "c0f48c69b1ad9c8bf4259f16dc0db524a42de452"
+		},
+		{
+			"ImportPath": "github.com/artyom/fb303",
+			"Rev": "fa4a241cefb113c4981dbac51a8cfcb047efa079"
+		},
+		{
+			"ImportPath": "github.com/artyom/scribe",
+			"Rev": "35c1da66e76d138c09c552b492bb341f8504ff40"
+		},
+		{
+			"ImportPath": "github.com/artyom/thrift",
+			"Rev": "388840a05deb9b7d85fdf6c225a2729fe1826cb7"
+		},
+		{
+			"ImportPath": "github.com/eapache/go-resiliency/breaker",
+			"Comment": "v1.0.0-1-ged0319b",
+			"Rev": "ed0319b32e66e3295db52695ba3ee493e823fbfe"
+		},
+		{
+			"ImportPath": "github.com/eapache/queue",
+			"Comment": "v1.0.1-2-gd1df561",
+			"Rev": "d1df561eb6b9ffdac8dd98f943e9e9096c76c059"
+		},
+		{
+			"ImportPath": "github.com/quipo/statsd",
+			"Rev": "b16c3be8a03e3c39a2d9c669b8f13f8876de61cd"
+		}
+	]
+}
