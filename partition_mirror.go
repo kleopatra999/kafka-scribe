@@ -1,0 +1,158 @@
+package main
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/Shopify/sarama"
+	"github.com/artyom/scribe"
+	"github.com/golang/glog"
+	"github.com/quipo/statsd"
+)
+
+type KafkaPartitionMirrorConfig struct {
+	topic        string
+	partition    int32
+	scribeCat    string
+	maxBatchSize int
+	maxBatchWait time.Duration
+	startOffset  int64
+}
+
+func NewKafkaPartitionMirrorConfig(topic string, partition int32, offset int64) KafkaPartitionMirrorConfig {
+	return KafkaPartitionMirrorConfig{
+		topic:        topic,
+		partition:    partition,
+		scribeCat:    topic,
+		maxBatchSize: 1000,
+		maxBatchWait: 500 * time.Millisecond,
+		startOffset:  offset,
+	}
+}
+
+type KafkaPartitionMirror struct {
+	consumer  sarama.Consumer
+	scribe    *ReliableScribeClient
+	cfg       KafkaPartitionMirrorConfig
+	stop      chan interface{}
+	stopping  bool
+	partition sarama.PartitionConsumer
+	offStore  *LocalOffsetStore
+	sd        statsd.Statsd
+}
+
+func NewKafkaPartitionMirror(c sarama.Consumer, rs *ReliableScribeClient, cfg KafkaPartitionMirrorConfig,
+	ofs *LocalOffsetStore, sd statsd.Statsd) (*KafkaPartitionMirror, error) {
+	kpm := &KafkaPartitionMirror{
+		consumer: c,
+		scribe:   rs,
+		cfg:      cfg,
+		stop:     make(chan interface{}),
+		offStore: ofs,
+		sd:       sd,
+	}
+
+	partition, err := c.ConsumePartition(cfg.topic, cfg.partition, cfg.startOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	kpm.partition = partition
+
+	return kpm, nil
+}
+
+func (kpm *KafkaPartitionMirror) Run() {
+
+	batch := make([]*scribe.LogEntry, 0, kpm.cfg.maxBatchSize)
+	maxOffset := kpm.cfg.startOffset
+	// Create timer that is immediately stopped.
+	// It won't fire until we get at least one message queued
+	batchTimer := time.NewTimer(kpm.cfg.maxBatchWait)
+	batchTimer.Stop()
+
+	for {
+		if kpm.stopping {
+			return
+		}
+
+		select {
+		case <-kpm.stop:
+			return
+
+		case m := <-kpm.partition.Messages():
+			beforeLen := len(batch)
+			// Grow batch slice we guarantee it's backing array isn't full below
+			batch = batch[:beforeLen+1]
+			batch[beforeLen] = &scribe.LogEntry{kpm.cfg.scribeCat, string(m.Value)}
+			maxOffset = m.Offset
+
+			if (beforeLen + 1) == cap(batch) {
+				// Actually send the batch we have
+				// this might block indefinitely waiting for scribe host to come up
+				err := kpm.sendBatch(&batch, maxOffset)
+				if err != nil {
+					// Should only happen if scribe client has been asked to close (i.e. we are shutting down)
+					// just return as we are going to stop soon too presumably.
+					kpm.Stop()
+					return
+				}
+				batchTimer.Stop()
+			} else if beforeLen < 1 {
+				// This was first message in this batch, set timer so it will be sent if batch is not filled
+				// within the next maxBatchWait time
+				batchTimer.Reset(kpm.cfg.maxBatchWait)
+			}
+
+		case <-batchTimer.C:
+			if len(batch) > 0 {
+				err := kpm.sendBatch(&batch, maxOffset)
+				if err != nil {
+					// Should only happen if scribe client has been asked to close (i.e. we are shutting down)
+					// just return as we are going to stop soon too presumably.
+					kpm.Stop()
+					return
+				}
+				batchTimer.Stop()
+			} else {
+				glog.Infoln(kpm.cfg.partition, "Busy wait nothing to do.. ")
+			}
+		}
+	}
+}
+
+func (kpm *KafkaPartitionMirror) sendBatch(batch *[]*scribe.LogEntry, maxOffset int64) error {
+	// Actually send the batch we have
+	// this might block indefinitely waiting for scribe host to come up
+	err := kpm.scribe.Log(*batch)
+	if err != nil {
+		return err
+	}
+
+	// Sent OK update offset in local file
+	kpm.offStore.MarkOffsetProcessed(kpm.cfg.topic, kpm.cfg.partition, maxOffset)
+
+	numSent := len(*batch)
+
+	glog.V(1).Infof("Partition (%s, %d) delivered %d messages to %s (up to offset %d)",
+		kpm.cfg.topic, kpm.cfg.partition, numSent,
+		kpm.cfg.scribeCat, maxOffset)
+
+	// Reset batch, should be safe to re-use since we waited for scribe client to be done with sending it
+	*batch = (*batch)[:0]
+
+	kpm.sd.Gauge(fmt.Sprintf("%s.%02d.max_offset", kpm.cfg.topic, kpm.cfg.partition), maxOffset)
+	kpm.sd.Incr(fmt.Sprintf("%s.%02d.msgs_relayed", kpm.cfg.topic, kpm.cfg.partition), int64(numSent))
+
+	return nil
+}
+
+func (kpm *KafkaPartitionMirror) Stop() {
+	if kpm.stopping {
+		return
+	}
+	glog.Infof("Stopping mirror for (%s, %d)", kpm.cfg.topic, kpm.cfg.partition)
+	kpm.stopping = true
+	close(kpm.stop)
+	kpm.partition.Close()
+}
