@@ -17,7 +17,7 @@ type LocalOffsetStore struct {
 	m                  map[string]int64
 	dirty              bool
 	mu                 sync.Mutex
-	stop               chan interface{}
+	stop               chan struct{}
 	stopping           bool
 	commitCoalesceTime time.Duration
 }
@@ -26,7 +26,7 @@ func NewLocalOffsetStore(fileName string, commitCoalesceTime time.Duration) *Loc
 	los := &LocalOffsetStore{
 		fName:              fileName,
 		m:                  make(map[string]int64),
-		stop:               make(chan interface{}),
+		stop:               make(chan struct{}),
 		commitCoalesceTime: commitCoalesceTime,
 	}
 

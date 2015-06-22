@@ -2,21 +2,32 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"hash/fnv"
 	"log"
 	"os"
 	"os/signal"
 	"strings"
+
+	"github.com/Shopify/sarama"
 )
 
 func main() {
 
-	var brokerList, topicList string
+	var brokerList, topic string
 
 	flag.StringVar(&brokerList, "broker-list", "localhost:9092", "host:port[,..] list of brokers to produce to")
+	flag.StringVar(&topic, "topic", "", "topic to produce to")
 
 	flag.Parse()
 
-	producer, err := NewAsyncProducer(strings.Split(brokerList, ","), nil)
+	if len(topic) < 1 {
+		fmt.Println("Must provide -topic")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	producer, err := sarama.NewAsyncProducer(strings.Split(brokerList, ","), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -31,10 +42,26 @@ func main() {
 	signal.Notify(signals, os.Interrupt)
 
 	var enqueued, errors int
+	n := 0
+	hasher := fnv.New64a()
 ProducerLoop:
 	for {
+		hasher.Reset()
+
+		val := []byte(fmt.Sprintf("%010d", n))
+		hasher.Write(val)
+		val = append(val, fmt.Sprintf(" %x|", hasher.Sum64())...)
+		n++
+
+		m := &sarama.ProducerMessage{
+			Topic: topic,
+			Key:   sarama.StringEncoder(fmt.Sprintf("%d", n)),
+			Value: sarama.ByteEncoder(val),
+		}
+
 		select {
-		case producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder("testing 123")}:
+		case producer.Input() <- m:
+			fmt.Printf("\rSent % 10d", n)
 			enqueued++
 		case err := <-producer.Errors():
 			log.Println("Failed to produce message", err)

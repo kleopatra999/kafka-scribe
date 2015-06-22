@@ -19,7 +19,7 @@ var ClosingError = fmt.Errorf("Client is stopping, cancelled pending request")
 type ReliableScribeClient struct {
 	host     string
 	scribe   *scribe.ScribeClient
-	stop     chan interface{}
+	stop     chan struct{}
 	stopping bool
 	mu       sync.Mutex
 }
@@ -28,7 +28,7 @@ func NewReliableScribeClient(host string) *ReliableScribeClient {
 	rs := &ReliableScribeClient{
 		host:   host,
 		scribe: nil,
-		stop:   make(chan interface{}),
+		stop:   make(chan struct{}),
 	}
 	return rs
 }
@@ -48,7 +48,7 @@ func (rs *ReliableScribeClient) Log(entries []*scribe.LogEntry) error {
 
 	var err error
 
-	var backOff = 50 * time.Millisecond
+	var backOff = 250 * time.Millisecond
 	var maxBackOff = 5 * time.Minute
 
 	var retryBackoff = func(err error) {
