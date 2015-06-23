@@ -5,7 +5,7 @@ package fb303
 
 import (
 	"fmt"
-	"github.com/artyom/thrift"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/artyom/thrift"
 	"math"
 )
 

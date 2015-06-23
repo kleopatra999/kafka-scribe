@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/artyom/scribe"
-	"github.com/artyom/thrift"
-	"github.com/golang/glog"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/artyom/scribe"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/artyom/thrift"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/golang/glog"
 )
 
 var BackPressureError = fmt.Errorf("Backpressure! Scribe client queue hit max pending requests")

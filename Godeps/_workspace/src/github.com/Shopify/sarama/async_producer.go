@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/eapache/go-resiliency/breaker"
-	"github.com/eapache/queue"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/eapache/go-resiliency/breaker"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/eapache/queue"
 )
 
 func forceFlushThreshold() int {

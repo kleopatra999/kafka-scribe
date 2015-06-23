@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Shopify/sarama"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
 
-	"github.com/quipo/statsd"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/quipo/statsd"
 
-	"github.com/golang/glog"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/golang/glog"
 )
 
 // startTopicMirrors finds all partitions for topic from consumer and starts a KafkaPartitionMirror

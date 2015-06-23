@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Shopify/sarama"
-	"github.com/artyom/scribe"
-	"github.com/golang/glog"
-	"github.com/quipo/statsd"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/artyom/scribe"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/golang/glog"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/quipo/statsd"
 )
 
 type KafkaPartitionMirrorConfig struct {

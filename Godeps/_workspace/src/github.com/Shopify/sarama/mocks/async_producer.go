@@ -3,7 +3,7 @@ package mocks
 import (
 	"sync"
 
-	"github.com/Shopify/sarama"
+	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
 )
 
 // AsyncProducer implements sarama's Producer interface for testing purposes.
