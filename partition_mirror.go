@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
@@ -35,7 +36,7 @@ type KafkaPartitionMirror struct {
 	scribe    *ReliableScribeClient
 	cfg       KafkaPartitionMirrorConfig
 	stop      chan interface{}
-	stopping  bool
+	stopOnce  sync.Once
 	partition sarama.PartitionConsumer
 	offStore  *LocalOffsetStore
 	sd        statsd.Statsd
@@ -72,10 +73,6 @@ func (kpm *KafkaPartitionMirror) Run() {
 	batchTimer.Stop()
 
 	for {
-		if kpm.stopping {
-			return
-		}
-
 		select {
 		case <-kpm.stop:
 			return
@@ -148,11 +145,9 @@ func (kpm *KafkaPartitionMirror) sendBatch(batch *[]*scribe.LogEntry, maxOffset 
 }
 
 func (kpm *KafkaPartitionMirror) Stop() {
-	if kpm.stopping {
-		return
-	}
-	glog.Infof("Stopping mirror for (%s, %d)", kpm.cfg.topic, kpm.cfg.partition)
-	kpm.stopping = true
-	close(kpm.stop)
-	kpm.partition.Close()
+	kpm.stopOnce.Do(func() {
+		glog.Infof("Stopping mirror for (%s, %d)", kpm.cfg.topic, kpm.cfg.partition)
+		close(kpm.stop)
+		kpm.partition.Close()
+	})
 }

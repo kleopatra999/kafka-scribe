@@ -20,7 +20,7 @@ type ReliableScribeClient struct {
 	host     string
 	scribe   *scribe.ScribeClient
 	stop     chan struct{}
-	stopping bool
+	stopOnce sync.Once
 	mu       sync.Mutex
 }
 
@@ -34,15 +34,12 @@ func NewReliableScribeClient(host string) *ReliableScribeClient {
 }
 
 func (rs *ReliableScribeClient) Stop() {
-	rs.stopping = true
-	close(rs.stop)
+	rs.stopOnce.Do(func() {
+		close(rs.stop)
+	})
 }
 
 func (rs *ReliableScribeClient) Log(entries []*scribe.LogEntry) error {
-	if rs.stopping {
-		return ClosingError
-	}
-
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 
@@ -71,7 +68,7 @@ func (rs *ReliableScribeClient) Log(entries []*scribe.LogEntry) error {
 	// but that's as designed - they can't make progress if scribe host is
 	// not available and the back-pressure is helpful
 	for {
-		if rs.stopping {
+		if rs.shouldStop() {
 			return ClosingError
 		}
 
@@ -94,8 +91,21 @@ func (rs *ReliableScribeClient) Log(entries []*scribe.LogEntry) error {
 	}
 }
 
+// shouldStop checks if the stop chan is closed, without blocking on it
+// if it is not.
+func (rs *ReliableScribeClient) shouldStop() bool {
+	select {
+	case _, ok := <-rs.stop:
+		// ok = true should never actually happen as we never send on stop, just close it
+		return !ok
+	default:
+		// Continue without blocking if the stop chan is still open
+		return false
+	}
+}
+
 func connectScribe(host string) (*scribe.ScribeClient, error) {
-	var socket, err = thrift.NewTSocket(host)
+	var socket, err = thrift.NewTSocketTimeout(host, 5*time.Second)
 	if err != nil {
 		return nil, err
 	}

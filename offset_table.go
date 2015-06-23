@@ -18,7 +18,7 @@ type LocalOffsetStore struct {
 	dirty              bool
 	mu                 sync.Mutex
 	stop               chan struct{}
-	stopping           bool
+	stopOnce           sync.Once
 	commitCoalesceTime time.Duration
 }
 
@@ -98,11 +98,10 @@ func (los *LocalOffsetStore) run() {
 }
 
 func (los *LocalOffsetStore) Close() {
-	los.mu.Lock()
-	los.stopping = true
-	los.mu.Unlock()
-	close(los.stop)
-	los.Sync()
+	los.stopOnce.Do(func() {
+		close(los.stop)
+		los.Sync()
+	})
 }
 
 // Assumes los is open successfully...
