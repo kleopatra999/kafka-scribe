@@ -52,6 +52,23 @@ func startTopicMirrors(c sarama.Consumer, rs *ReliableScribeClient, ofs *LocalOf
 	return mirrors
 }
 
+// SaramaGlogger is a shim that implements sarama.StdLogger interface but calls glog.* methods
+type SaramaGlogger struct{}
+
+func (sg *SaramaGlogger) Print(v ...interface{}) {
+	v = append([]interface{}{"[Sarama]"}, v...)
+	glog.Info(v...)
+}
+
+func (sg *SaramaGlogger) Printf(format string, v ...interface{}) {
+	glog.Infof("[Sarama] "+format, v...)
+}
+
+func (sg *SaramaGlogger) Println(v ...interface{}) {
+	v = append([]interface{}{"[Sarama]"}, v...)
+	glog.Infoln(v...)
+}
+
 func main() {
 	var kafkaBrokers string
 	var scribeHost string
@@ -102,6 +119,9 @@ func main() {
 
 	scribeClient := NewReliableScribeClient(scribeHost)
 	defer scribeClient.Stop()
+
+	// Set sarama logger to use glog shim
+	sarama.Logger = &SaramaGlogger{}
 
 	config := sarama.NewConfig()
 	consumer, err := sarama.NewConsumer(strings.Split(kafkaBrokers, ","), config)
