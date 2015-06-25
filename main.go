@@ -58,7 +58,7 @@ func main() {
 	var topicMap = TopicMap{m: make(map[string]string)}
 	var offsetStoreFile string
 	var offsetCommitWaitMs int
-	var statsdHost string
+	var statsdHost, statsdPrefix string
 
 	flag.Var(&topicMap, "t", "Topic map, for each topic in Kafka to relay, add an argument like: '-t topic_name'."+
 		"If you want the Kafka topic to be relayed to a Scribe category with a different name then use "+
@@ -72,6 +72,9 @@ func main() {
 
 	flag.StringVar(&statsdHost, "statsd-host", "",
 		"hostname:port for statsd. If none given then metrics are not recorded")
+
+	flag.StringVar(&statsdPrefix, "statsd-prefix", "kafka-scribe.",
+		"prefix for statsd metrics logged")
 
 	flag.StringVar(&offsetStoreFile, "offset-file", "kafka-scribe-offsets.json",
 		"The file to read/write offsets to as we go")
@@ -111,7 +114,7 @@ func main() {
 	var sd statsd.Statsd
 
 	if len(statsdHost) > 0 {
-		statsdClient = statsd.NewStatsdClient(statsdHost, "kafka-scribe.")
+		statsdClient = statsd.NewStatsdClient(statsdHost, statsdPrefix)
 		statsdClient.CreateSocket()
 		sd = statsd.NewStatsdBuffer(1*time.Second, statsdClient)
 	} else {
