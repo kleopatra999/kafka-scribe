@@ -16,7 +16,7 @@ package mocks
 import (
 	"errors"
 
-	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
+	"github.com/DeviantArt/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
 )
 
 // A simple interface that includes the testing.T methods we use to report

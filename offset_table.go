@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
-	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/golang/glog"
+	"github.com/DeviantArt/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
+	"github.com/DeviantArt/kafka-scribe/Godeps/_workspace/src/github.com/golang/glog"
 )
 
 type LocalOffsetStore struct {

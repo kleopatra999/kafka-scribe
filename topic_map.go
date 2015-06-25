@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/golang/glog"
+	"github.com/DeviantArt/kafka-scribe/Godeps/_workspace/src/github.com/golang/glog"
 )
 
 type TopicMap struct {

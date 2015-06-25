@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/code.google.com/p/snappy-go/snappy"
+	"github.com/DeviantArt/kafka-scribe/Godeps/_workspace/src/code.google.com/p/snappy-go/snappy"
 )
 
 var snappyMagic = []byte{130, 83, 78, 65, 80, 80, 89, 0}

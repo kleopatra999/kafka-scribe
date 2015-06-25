@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
-	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama/mocks"
+	"github.com/DeviantArt/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
+	"github.com/DeviantArt/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama/mocks"
 )
 
 // In normal operation, we expect one access log entry,

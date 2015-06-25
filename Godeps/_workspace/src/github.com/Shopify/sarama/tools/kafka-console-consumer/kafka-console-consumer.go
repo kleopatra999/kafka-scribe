@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
+	"github.com/DeviantArt/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
 )
 
 var (

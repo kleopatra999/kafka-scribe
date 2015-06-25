@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
-	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/artyom/scribe"
-	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/golang/glog"
-	"github.com/deviantart/kafka-scribe/Godeps/_workspace/src/github.com/quipo/statsd"
+	"github.com/DeviantArt/kafka-scribe/Godeps/_workspace/src/github.com/Shopify/sarama"
+	"github.com/DeviantArt/kafka-scribe/Godeps/_workspace/src/github.com/artyom/scribe"
+	"github.com/DeviantArt/kafka-scribe/Godeps/_workspace/src/github.com/golang/glog"
+	"github.com/DeviantArt/kafka-scribe/Godeps/_workspace/src/github.com/quipo/statsd"
 )
 
 type KafkaPartitionMirrorConfig struct {
