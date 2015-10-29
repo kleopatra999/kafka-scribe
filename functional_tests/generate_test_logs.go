@@ -50,7 +50,13 @@ ProducerLoop:
 
 		val := []byte(fmt.Sprintf("%010d", n))
 		hasher.Write(val)
-		val = append(val, fmt.Sprintf(" %x|", hasher.Sum64())...)
+		// Alternate JSON and non-JSON payloads to validate
+		// our JSON offset additions
+		if n%2 == 0 {
+			val = append(val, fmt.Sprintf(" %x|", hasher.Sum64())...)
+		} else {
+			val = []byte(fmt.Sprintf("{\"n\":%d,\"hash\":\"%x\"}", n, hasher.Sum64()))
+		}
 		n++
 
 		m := &sarama.ProducerMessage{

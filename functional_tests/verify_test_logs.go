@@ -31,12 +31,14 @@ package main
 
 import (
 	"bufio"
-	"encoding/binary"
+	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"hash/fnv"
 	"io"
 	"os"
+	"strconv"
 )
 
 func panic_or_break(err error) bool {
@@ -50,56 +52,106 @@ func panic_or_break(err error) bool {
 }
 
 func main() {
-	inputFile := flag.String("i", "", "The input file to read")
 
+	var inputFile string
 	var expectedNum int
+	var expectOffsets bool
+
+	flag.StringVar(&inputFile, "i", "", "The input file to read")
 	flag.IntVar(&expectedNum, "expected-num", -1, "The total number of messages sent during the test run by generate_test_logs.go")
+	flag.BoolVar(&expectOffsets, "expect-offsets", false, "Include flag if generate_test_logs.go was run with -add-json-offsets option to validate json messages contain sane offsets")
 
 	flag.Parse()
 
-	if len(*inputFile) == 0 || expectedNum < 0 {
+	if len(inputFile) == 0 || expectedNum < 0 {
 		fmt.Println("Input file, and expected number must be given")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
 
-	f, err := os.Open(*inputFile)
+	f, err := os.Open(inputFile)
 	if err != nil {
 		panic(err)
 	}
 
 	r := bufio.NewReader(f)
 
-	var seen = make(map[int]struct{})
+	s := bufio.NewScanner(r)
+	// We have two formats of message - text ending in | and json (which we guarantee
+	// not to contain } except at end)
+	s.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+		n := bytes.IndexAny(data, "|}")
+		if n < 0 {
+			return 0, nil, nil
+		}
+		// Include the terminating char
+		return n + 1, data[0 : n+1], nil
+	})
+
+	var seen = make(map[int]bool)
+	var offsetsSeen = make(map[int]map[int]bool)
 	hasher := fnv.New64a()
 
 	fail := false
 
-	numLines := 0
+	numMessages := 0
 	for {
 		var n int
 		var h uint64
 
+		// Lines should alternate between JSON and plain text but due to partitioning
+		// we don't get order guaranteed so accept either
+		if !s.Scan() {
+			break
+		}
+
+		m := s.Bytes()
+
 		// Each record in log format has a 4 byte prefix
 		// which I assumed was meant to be length but is actually always 0x00000000
 		// for some reason.. ignore it anyway...
-		var l uint32
-		err := binary.Read(r, binary.LittleEndian, &l)
-		if panic_or_break(err) {
-			break
+		m = m[4:]
+
+		if len(m) < 1 {
+			fmt.Println("WARN: Empty message")
+			continue
 		}
 
-		_, err = fmt.Fscanf(r, "%10d %x|", &n, &h)
-		if panic_or_break(err) {
-			break
+		if m[0] == '{' {
+			// Treat it as JSON
+			var message map[string]interface{}
+			err = json.Unmarshal(m, &message)
+			if panic_or_break(err) {
+				break
+			}
+			n = int(message["n"].(float64))
+			hex := message["hash"].(string)
+			h, err = strconv.ParseUint(hex, 16, 64)
+			if panic_or_break(err) {
+				break
+			}
+			if expectOffsets {
+				offset := int(message["kafka_offset"].(float64))
+				part := int(message["kafka_partition"].(float64))
+				if offsetsSeen[part][offset] {
+					fmt.Println("FAIL: Duplicate delivery for %d", n)
+					fail = true
+				} else {
+					offsetsSeen[part][offset] = true
+				}
+			}
+		} else {
+			_, err = fmt.Sscanf(string(m), "%10d %x|", &n, &h)
+			if panic_or_break(err) {
+				break
+			}
 		}
 
-		_, ok := seen[n]
-		if ok {
+		if seen[n] {
 			fmt.Println("FAIL: Duplicate delivery for %d", n)
 			fail = true
 		} else {
-			seen[n] = struct{}{}
+			seen[n] = true
 		}
 
 		if n >= expectedNum {
@@ -114,14 +166,14 @@ func main() {
 			fail = true
 		}
 
-		fmt.Printf("\rProcessed % 10d lines", numLines+1)
+		fmt.Printf("\rProcessed % 10d messages", numMessages+1)
 
-		numLines++
+		numMessages++
 	}
 
-	fmt.Printf("\nDONE: found %d log entries, expected %d, difference: %d\n", numLines, expectedNum, numLines-expectedNum)
+	fmt.Printf("\nDONE: found %d log entries, expected %d, difference: %d\n", numMessages, expectedNum, numMessages-expectedNum)
 
-	if numLines-expectedNum != 0 {
+	if numMessages-expectedNum != 0 {
 		fail = true
 	}
 

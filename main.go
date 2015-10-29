@@ -19,7 +19,7 @@ import (
 // in a goroutine for each one
 // TODO make errors here non-fatal so we can gracefully continue. That means retrying and handling partial failures gracefully.
 func startTopicMirrors(c sarama.Consumer, rs *ReliableScribeClient, ofs *LocalOffsetStore, sd statsd.Statsd,
-	topic, category string) []*KafkaPartitionMirror {
+	topic, category string, addOffsetsToJSON bool) []*KafkaPartitionMirror {
 
 	partitions, err := c.Partitions(topic)
 	if err != nil {
@@ -35,7 +35,7 @@ func startTopicMirrors(c sarama.Consumer, rs *ReliableScribeClient, ofs *LocalOf
 		if err != nil {
 			glog.Fatalf("Failed to get offset for (%s, %d) due to: %s", topic, p, err)
 		}
-		cfg := NewKafkaPartitionMirrorConfig(topic, p, startOffset)
+		cfg := NewKafkaPartitionMirrorConfig(topic, p, startOffset, addOffsetsToJSON)
 		cfg.scribeCat = category
 		mirror, err := NewKafkaPartitionMirror(c, rs, cfg, ofs, sd)
 		if err != nil {
@@ -76,6 +76,7 @@ func main() {
 	var offsetStoreFile string
 	var offsetCommitWaitMs int
 	var statsdHost, statsdPrefix string
+	var addOffsetsToJSON bool
 
 	flag.Var(&topicMap, "t", "Topic map, for each topic in Kafka to relay, add an argument like: '-t topic_name'."+
 		"If you want the Kafka topic to be relayed to a Scribe category with a different name then use "+
@@ -98,6 +99,10 @@ func main() {
 
 	flag.IntVar(&offsetCommitWaitMs, "offset-file-commit-wait-ms", 100,
 		"how regularly (in milliseconds) to commit offsets file in an attempt to coalesce multiple writes into one")
+
+	flag.BoolVar(&addOffsetsToJSON, "add-offsets-to-json", false,
+		"is set, will add kafka partition and offset keys to messages that look like JSON objects (end in '}')."+
+			" If you might have messages that are NOT json objects but might end in '{' you really shouldn't use this")
 
 	flag.Parse()
 
@@ -144,7 +149,7 @@ func main() {
 	mirrors := make([]*KafkaPartitionMirror, 0, 16)
 
 	for topic, category := range topicMap.m {
-		ms := startTopicMirrors(consumer, scribeClient, offsetStore, sd, topic, category)
+		ms := startTopicMirrors(consumer, scribeClient, offsetStore, sd, topic, category, addOffsetsToJSON)
 		mirrors = append(mirrors, ms...)
 	}
 

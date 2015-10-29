@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"sync"
 	"time"
@@ -11,23 +12,30 @@ import (
 	"github.com/DeviantArt/kafka-scribe/Godeps/_workspace/src/github.com/quipo/statsd"
 )
 
+const (
+	OffsetKeyJson        = "%s,\"kafka_offset\":%d,\"kafka_partition\":%d}"
+	OffsetKeyJsonNoComma = "%s\"kafka_offset\":%d,\"kafka_partition\":%d}"
+)
+
 type KafkaPartitionMirrorConfig struct {
-	topic        string
-	partition    int32
-	scribeCat    string
-	maxBatchSize int
-	maxBatchWait time.Duration
-	startOffset  int64
+	topic            string
+	partition        int32
+	scribeCat        string
+	maxBatchSize     int
+	maxBatchWait     time.Duration
+	startOffset      int64
+	addOffsetsToJSON bool
 }
 
-func NewKafkaPartitionMirrorConfig(topic string, partition int32, offset int64) KafkaPartitionMirrorConfig {
+func NewKafkaPartitionMirrorConfig(topic string, partition int32, offset int64, addOffsetsToJSON bool) KafkaPartitionMirrorConfig {
 	return KafkaPartitionMirrorConfig{
-		topic:        topic,
-		partition:    partition,
-		scribeCat:    topic,
-		maxBatchSize: 1000,
-		maxBatchWait: 500 * time.Millisecond,
-		startOffset:  offset,
+		topic:            topic,
+		partition:        partition,
+		scribeCat:        topic,
+		maxBatchSize:     1000,
+		maxBatchWait:     500 * time.Millisecond,
+		startOffset:      offset,
+		addOffsetsToJSON: addOffsetsToJSON,
 	}
 }
 
@@ -81,7 +89,22 @@ func (kpm *KafkaPartitionMirror) Run() {
 			beforeLen := len(batch)
 			// Grow batch slice we guarantee it's backing array isn't full below
 			batch = batch[:beforeLen+1]
-			batch[beforeLen] = &scribe.LogEntry{kpm.cfg.scribeCat, string(m.Value)}
+			// Hackily insert kafka offset into message if it's jsonish
+			// To save on overhead of parsing JSON and re-encoding it, we assume
+			// all messages ending in `}` are valid JSON just do simple replace...
+			var message string
+			if kpm.cfg.addOffsetsToJSON && len(m.Value) > 1 && m.Value[len(m.Value)-1] == '}' {
+				// We already checked there is at least 2 bytes in message above
+				format := OffsetKeyJson
+				if bytes.Equal(m.Value[len(m.Value)-2:], []byte("{}")) {
+					// Edge case where value ends with empty object, remove comma from our trailer
+					format = OffsetKeyJsonNoComma
+				}
+				message = fmt.Sprintf(format, m.Value[0:len(m.Value)-1], m.Offset, kpm.cfg.partition)
+			} else {
+				message = string(m.Value)
+			}
+			batch[beforeLen] = &scribe.LogEntry{kpm.cfg.scribeCat, message}
 			maxOffset = m.Offset
 
 			if (beforeLen + 1) == cap(batch) {
