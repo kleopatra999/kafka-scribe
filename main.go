@@ -92,17 +92,17 @@ func main() {
 		"hostname:port for statsd. If none given then metrics are not recorded")
 
 	flag.StringVar(&statsdPrefix, "statsd-prefix", "kafka-scribe.",
-		"prefix for statsd metrics logged")
+		"Prefix for statsd metrics logged")
 
 	flag.StringVar(&offsetStoreFile, "offset-file", "kafka-scribe-offsets.json",
 		"The file to read/write offsets to as we go")
 
 	flag.IntVar(&offsetCommitWaitMs, "offset-file-commit-wait-ms", 100,
-		"how regularly (in milliseconds) to commit offsets file in an attempt to coalesce multiple writes into one")
+		"How regularly (in milliseconds) to commit offsets file in an attempt to coalesce multiple writes into one")
 
 	flag.BoolVar(&addOffsetsToJSON, "add-offsets-to-json", false,
-		"is set, will add kafka partition and offset keys to messages that look like JSON objects (end in '}')."+
-			" If you might have messages that are NOT json objects but might end in '{' you really shouldn't use this")
+		"If set, will add kafka partition and offset keys to messages that look like JSON objects (end in '}')."+
+			" WARNING: If you might have messages that are NOT json objects but might end in '}' you really shouldn't use this")
 
 	flag.Parse()
 
