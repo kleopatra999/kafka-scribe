@@ -25,9 +25,10 @@ type KafkaPartitionMirrorConfig struct {
 	maxBatchWait     time.Duration
 	startOffset      int64
 	addOffsetsToJSON bool
+	filterWithSuffix []byte
 }
 
-func NewKafkaPartitionMirrorConfig(topic string, partition int32, offset int64, addOffsetsToJSON bool) KafkaPartitionMirrorConfig {
+func NewKafkaPartitionMirrorConfig(topic string, partition int32, offset int64, addOffsetsToJSON bool, filterWithSuffix string) KafkaPartitionMirrorConfig {
 	return KafkaPartitionMirrorConfig{
 		topic:            topic,
 		partition:        partition,
@@ -36,6 +37,7 @@ func NewKafkaPartitionMirrorConfig(topic string, partition int32, offset int64, 
 		maxBatchWait:     500 * time.Millisecond,
 		startOffset:      offset,
 		addOffsetsToJSON: addOffsetsToJSON,
+		filterWithSuffix: []byte(filterWithSuffix),
 	}
 }
 
@@ -86,6 +88,13 @@ func (kpm *KafkaPartitionMirror) Run() {
 			return
 
 		case m := <-kpm.partition.Messages():
+			// This must happen before we mess about with the batch capacity...
+			if len(kpm.cfg.filterWithSuffix) > 0 && bytes.HasSuffix(m.Value, kpm.cfg.filterWithSuffix) {
+				// Drop this message as it matches the filter suffix
+				kpm.sd.Incr(fmt.Sprintf("%s.%02d.msgs_filtered", kpm.cfg.topic, kpm.cfg.partition), 1)
+				continue
+			}
+
 			beforeLen := len(batch)
 			// Grow batch slice we guarantee it's backing array isn't full below
 			batch = batch[:beforeLen+1]

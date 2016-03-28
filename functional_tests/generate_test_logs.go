@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"time"
 
 	"github.com/Shopify/sarama"
 )
@@ -15,9 +16,11 @@ import (
 func main() {
 
 	var brokerList, topic string
+	var interactive bool
 
 	flag.StringVar(&brokerList, "broker-list", "localhost:9092", "host:port[,..] list of brokers to produce to")
 	flag.StringVar(&topic, "topic", "", "topic to produce to")
+	flag.BoolVar(&interactive, "interactive", false, "run in interactive mode (throttled to 1 per second)")
 
 	flag.Parse()
 
@@ -52,10 +55,15 @@ ProducerLoop:
 		hasher.Write(val)
 		// Alternate JSON and non-JSON payloads to validate
 		// our JSON offset additions
+		// Make every 3rd JSON message have a filterable flag suffix
 		if n%2 == 0 {
 			val = append(val, fmt.Sprintf(" %x|", hasher.Sum64())...)
 		} else {
-			val = []byte(fmt.Sprintf("{\"n\":%d,\"hash\":\"%x\"}", n, hasher.Sum64()))
+			suffix := ""
+			if n%3 == 0 {
+				suffix = ",\"_repd\":1"
+			}
+			val = []byte(fmt.Sprintf("{\"n\":%d,\"hash\":\"%x\"%s}", n, hasher.Sum64(), suffix))
 		}
 		n++
 
@@ -74,6 +82,9 @@ ProducerLoop:
 			errors++
 		case <-signals:
 			break ProducerLoop
+		}
+		if interactive {
+			time.Sleep(1 * time.Second)
 		}
 	}
 

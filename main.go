@@ -19,7 +19,7 @@ import (
 // in a goroutine for each one
 // TODO make errors here non-fatal so we can gracefully continue. That means retrying and handling partial failures gracefully.
 func startTopicMirrors(c sarama.Consumer, rs *ReliableScribeClient, ofs *LocalOffsetStore, sd statsd.Statsd,
-	topic, category string, addOffsetsToJSON bool) []*KafkaPartitionMirror {
+	topic, category string, addOffsetsToJSON bool, filterWithSuffix string) []*KafkaPartitionMirror {
 
 	partitions, err := c.Partitions(topic)
 	if err != nil {
@@ -35,7 +35,7 @@ func startTopicMirrors(c sarama.Consumer, rs *ReliableScribeClient, ofs *LocalOf
 		if err != nil {
 			glog.Fatalf("Failed to get offset for (%s, %d) due to: %s", topic, p, err)
 		}
-		cfg := NewKafkaPartitionMirrorConfig(topic, p, startOffset, addOffsetsToJSON)
+		cfg := NewKafkaPartitionMirrorConfig(topic, p, startOffset, addOffsetsToJSON, filterWithSuffix)
 		cfg.scribeCat = category
 		mirror, err := NewKafkaPartitionMirror(c, rs, cfg, ofs, sd)
 		if err != nil {
@@ -77,6 +77,7 @@ func main() {
 	var offsetCommitWaitMs int
 	var statsdHost, statsdPrefix string
 	var addOffsetsToJSON bool
+	var filterWithSuffix string
 
 	flag.Var(&topicMap, "t", "Topic map, for each topic in Kafka to relay, add an argument like: '-t topic_name'."+
 		"If you want the Kafka topic to be relayed to a Scribe category with a different name then use "+
@@ -103,6 +104,10 @@ func main() {
 	flag.BoolVar(&addOffsetsToJSON, "add-offsets-to-json", false,
 		"If set, will add kafka partition and offset keys to messages that look like JSON objects (end in '}')."+
 			" WARNING: If you might have messages that are NOT json objects but might end in '}' you really shouldn't use this")
+
+	flag.StringVar(&filterWithSuffix, "filter-with-suffix", "",
+		"A suffix string that will be matched exactly against each message."+
+			"If this is non-empty and a message has a matching suffix, we will drop the message silently instead of relaying it.")
 
 	flag.Parse()
 
@@ -149,7 +154,7 @@ func main() {
 	mirrors := make([]*KafkaPartitionMirror, 0, 16)
 
 	for topic, category := range topicMap.m {
-		ms := startTopicMirrors(consumer, scribeClient, offsetStore, sd, topic, category, addOffsetsToJSON)
+		ms := startTopicMirrors(consumer, scribeClient, offsetStore, sd, topic, category, addOffsetsToJSON, filterWithSuffix)
 		mirrors = append(mirrors, ms...)
 	}
 
@@ -164,6 +169,10 @@ func main() {
 	for _, mirror := range mirrors {
 		mirror.Stop()
 	}
+
+	// Explicit close since Sarama apparently can keep whole program alive
+	// even after we stopped all our mirrors with background meta updates...
+	//consumer.Close()
 
 	glog.Flush()
 
